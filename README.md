@@ -1,8 +1,10 @@
 # **Integrative Multi-faceted Proteomics: Deconvoluting Expression, Stability, and Redox Dynamics in the Interferon Response**
 
-R code to reproduce the main analysis and figures of the study.
+Publication: TBA.
 
-Publications TBA.
+# Overview
+
+This repository contains the R-based bioinformatics pipeline used to process, analyze, and visualize data generated via the PISA-REX mass spectrometry methodology. The pipeline integrates protein expression, thermal stability, and redox dynamics to characterize the interferon (IFN) response on a system-wide scale.
 
 ## Primary Data Analysis Scripts:
 
@@ -10,15 +12,17 @@ Publications TBA.
 
 *pisaRex_pairwiseReport.R:* Provides a statistical/differential regulation report for the pair of interest. Calculated using the empirical Bayes method (limma).
 
-*DIABLO.R:* Performs a multiblock (s)PLS-DA analysis using the mixOmics package.
-
 *GSEA_Ranked_List.R:* Outputs the pre-ranked lists used for GSEA analysis.
+
+*DIABLO.R:* Performs a multiblock (s)PLS-DA analysis using the mixOmics package.
 
 ## Figures:
 
-Code used to generate the main figures of the paper can be found in the "Figures" folder.
+All R scripts utilized to generate the primary manuscript visualizations are located in the Figures/ directory.
 
-## Main R Packages used:
+## Main Dependencies:
+
+The analysis was performed in R, leveraging the tidyverse syntax alongside standard Bioconductor tools. Main packages utilized include:
 
 ```
 Tidyverse 2.0.0
