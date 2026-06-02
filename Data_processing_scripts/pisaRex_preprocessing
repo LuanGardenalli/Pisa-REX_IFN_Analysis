@@ -1,7 +1,7 @@
 library(tidyverse)
 library(readxl)
-data.proteins <- read_excel("PisaRex_HL60_Interferon_All_20250701_b_Protein.xlsx")
-data.peptides <- read_csv("PisaRex_HL60_Interferon_All_20250701_b_peptide.csv")
+data.proteins <- read_excel("/path/data")
+data.peptides <- read_csv("/path/data")
 
 #Pre processing data:
 pisaRex.preprocess <- function(data.peptides,
