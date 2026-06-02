@@ -2,210 +2,153 @@ library(ComplexHeatmap)
 library(circlize)
 
 P <- 0.05
-#Extract all accessions of proteins reaching significance in at least one group:
 facet <- "REX"
+
+#Extract all accessions of proteins reaching significance in at least one group:
+extract.sig.proteins <- function(data.peptides,
+                                 data.proteins,
+                                 cell.line,
+                                 type,
+                                 facet){
+  rowID  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
+                                   cell.line,
+                                   type,
+                                   facet) %>% 
+    filter(adj.P.Val < P) %>%
+    select(ID) %>% pull()
+}
 {
-  accessions.TRA  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="THP1",
-                                            type="Alpha",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
+  TA <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="THP1",
+                             type="Alpha",
+                             facet)
   
-  accessions.TRB  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="THP1",
-                                            type="Beta",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
+  TB <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="THP1",
+                             type="Beta",
+                             facet)
   
-  accessions.TRG  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="THP1",
-                                            type="Gamma",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
+  TG <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="THP1",
+                             type="Gamma",
+                             facet)
   
-  accessions.HRA  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="HL60",
-                                            type="Alpha",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
+  HA <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="HL60",
+                             type="Alpha",
+                             facet)
   
-  accessions.HRB  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="HL60",
-                                            type="Beta",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
+  HB <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="HL60",
+                             type="Beta",
+                             facet)
   
-  accessions.HRG  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                            cell.line="HL60",
-                                            type="Gamma",
-                                            facet=facet) %>% 
-    filter(adj.P.Val < P) %>%
-    select(ID) %>% pull()
-  
-  accessions <- unique(c(accessions.TRA, accessions.TRB, accessions.TRG, 
-                         accessions.HRA, accessions.HRB, accessions.HRG))
+  HG <- extract.sig.proteins(data.peptides,
+                             data.proteins,
+                             cell.line="HL60",
+                             type="Gamma",
+                             facet)
+  accessions <- unique(c(TA, TB, TG, HA, HB, HG))
 }
 
 #Colapse peptides into proteins, calculate Log2 Ratios for extracted accessions:
+Log2Ratios <- function(data.peptides,
+                       data.proteins,
+                       cell.line,
+                       type,
+                       facet,
+                       accessions){
+  rowID  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
+                                   cell.line,
+                                   type,
+                                   facet) %>% 
+    arrange(Rank) %>%  
+    distinct(ID, .keep_all = T) %>% 
+    filter(ID %in% accessions) %>% 
+    select(peptideRowID) %>% pull()
+  replicates <- pisaRex.preprocess(data.peptides,
+                                   data.proteins,
+                                   cell.line,
+                                   type,
+                                   facet) %>% 
+    filter(peptideRowID %in% rowID)
+  log2ratios <- replicates %>% 
+    select(`Master Protein Accessions`, contains("Abundance")) %>% 
+    rowwise() %>% 
+    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
+    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
+    mutate(across(starts_with("Abundance:"), ~ control_mean - .x)) %>% 
+    select(!control_mean)
+}
 {
-  rowID.TRA  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="THP1",
-                                       type="Alpha",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  TRA.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="THP1",
-                                       type="Alpha",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.TRA)
-  TRA.log2ratios <- TRA.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
+  TA <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="THP1",
+                   type="Alpha",
+                   facet,
+                   accessions)
   
-  rowID.TRB  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="THP1",
-                                       type="Beta",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  TRB.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="THP1",
-                                       type="Beta",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.TRB)
-  TRB.log2ratios <- TRB.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
+  TB <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="THP1",
+                   type="Beta",
+                   facet,
+                   accessions)
   
-  rowID.TRG  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="THP1",
-                                       type="Gamma",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  TRG.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="THP1",
-                                       type="Gamma",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.TRG)
-  TRG.log2ratios <- TRG.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
+  TG <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="THP1",
+                   type="Gamma",
+                   facet,
+                   accessions)
   
-  rowID.HRA  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="HL60",
-                                       type="Alpha",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  HRA.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="HL60",
-                                       type="Alpha",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.HRA)
-  HRA.log2ratios <- HRA.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
+  HA <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="HL60",
+                   type="Alpha",
+                   facet,
+                   accessions)
   
-  rowID.HRB  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="HL60",
-                                       type="Beta",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  HRB.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="HL60",
-                                       type="Beta",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.HRB)
-  HRB.log2ratios <- HRB.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
+  HB <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="HL60",
+                   type="Beta",
+                   facet,
+                   accessions)
   
-  rowID.HRG  <- pisaRex.pairwiseReport(data.peptides, data.proteins, 
-                                       cell.line="HL60",
-                                       type="Gamma",
-                                       facet=facet) %>% 
-    arrange(Rank) %>%  
-    distinct(ID, .keep_all = T) %>% 
-    filter(ID %in% accessions) %>% 
-    select(peptideRowID) %>% pull()
-  HRG.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line="HL60",
-                                       type="Gamma",
-                                       facet=facet) %>% 
-    filter(peptideRowID %in% rowID.HRG)
-  HRG.log2ratios <- HRG.replicates %>% 
-    select(`Master Protein Accessions`, contains("Abundance")) %>% 
-    rowwise() %>% 
-    mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-    select(`Master Protein Accessions`, contains("Sample"), control_mean) %>% 
-    mutate(across(starts_with("Abundance:"), ~control_mean - .x)) %>% 
-    select(!control_mean)
-
+  HG <- Log2Ratios(data.peptides,
+                   data.proteins,
+                   cell.line="HL60",
+                   type="Gamma",
+                   facet,
+                   accessions)
   
-  heatmap.df.TR <- merge(TRA.log2ratios, 
-                         TRB.log2ratios , 
-                         by= "Master Protein Accessions", 
-                         all.x=T, all.y=T)
-  heatmap.df.TR <- merge(heatmap.df.TR, 
-                         TRG.log2ratios , 
-                         by= "Master Protein Accessions", 
-                         all.x=T, all.y=T)
+  #Combine data into one matrix:
+  heatmap.df.T <- merge(TA, 
+                        TB, 
+                        by= "Master Protein Accessions",
+                        all.x=T, all.y=T)
+  heatmap.df.T <- merge(heatmap.df.T, 
+                        TG, 
+                        by= "Master Protein Accessions", 
+                        all.x=T, all.y=T)
   
-  heatmap.df.HR <- merge(HRA.log2ratios , 
-                         HRB.log2ratios , 
-                         by= "Master Protein Accessions", 
-                         all.x=T, all.y=T)
-  heatmap.df.HR <- merge(heatmap.df.HR, 
-                         HRG.log2ratios , 
-                         by= "Master Protein Accessions", 
-                         all.x=T, all.y=T)
+  heatmap.df.H <- merge(HA, 
+                        HB, 
+                        by= "Master Protein Accessions", 
+                        all.x=T, all.y=T)
+  heatmap.df.H <- merge(heatmap.df.H, 
+                        HG, 
+                        by= "Master Protein Accessions", 
+                        all.x=T, all.y=T)
   
-  heatmap.df <- merge(heatmap.df.TR,
-                      heatmap.df.HR, 
+  heatmap.df <- merge(heatmap.df.T,
+                      heatmap.df.H, 
                       by= "Master Protein Accessions", 
                       all.x=T, all.y=T)
   heatmap.df[is.na(heatmap.df)] <- 0
