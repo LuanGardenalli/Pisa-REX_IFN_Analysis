@@ -119,7 +119,7 @@ log2ratios <- function(data.peptides,
                           keep = F,
                           suffix = c(".THP1", ".HL"))
   
-  #There was one repeated Cys position, which is fixed by setting a black space in one of them:
+  #There was one repeated Cys position, which is fixed by setting a blank space in one of them:
   heatmap.df[9,2] <- " Cys189"
   
   #Creates mapping for FDR and P-value signs:
