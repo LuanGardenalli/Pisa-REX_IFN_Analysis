@@ -22,7 +22,7 @@ library(ComplexHeatmap)
 
 #Heatmaps of discriminant proteins. DIABLO hits are filtered by requiring orthogonal significance from unadjusted P.val from the limma analysis.
 cell.line <- "THP1"
-c <- 1  #Set component of interest
+c <- 2  #Set component of interest
 targets <- selectVar(final_multiclass_diablo, comp = c)
 
 #EXP/PISA:
@@ -31,46 +31,55 @@ P <- 0.05
 adj.p <- 1
 {
   #Filter DIABLO hits by limma significance:
+  extract.sig.proteins <- function(data.peptides,
+                                   data.proteins,
+                                   cell.line,
+                                   type,
+                                   facet){
+    rowID  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
+                                               cell.line=cell.line,
+                                               type,
+                                               facet) %>% 
+      filter(P.Value < P & adj.P.Val < adj.p & Accession %in% 
+               if (facet=="EXP")targets$expression$name else 
+                 if (facet=="PISA")targets$solubility$name) %>%
+      dplyr::select(Accession) %>% pull()
+  }
   {
-    rowID.A  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Alpha",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & Accession %in% 
-               if (facet=="EXP")targets$expression$name else 
-                 if (facet=="PISA")targets$solubility$name) %>%
-      dplyr::select(Accession) %>% pull()
+    A <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Alpha",
+                              facet)
     
-    rowID.B  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Beta",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & Accession %in% 
-               if (facet=="EXP")targets$expression$name else 
-                 if (facet=="PISA")targets$solubility$name) %>%
-      dplyr::select(Accession) %>% pull()
+    B <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Beta",
+                              facet)
     
-    rowID.G  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Gamma",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & Accession %in% 
-               if (facet=="EXP")targets$expression$name else 
-                 if (facet=="PISA")targets$solubility$name) %>%
-      dplyr::select(Accession) %>% pull()
-    
-    accessions <- unique(c(rowID.A, rowID.B, rowID.G))
+    G <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Gamma",
+                              facet)
+    accessions <- unique(c(A, B, G))
   }
   
   #Calculate Log2 Ratios:
-  {
-    A.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Alpha",
-                                       facet=facet) %>% 
+  Log2Ratios <- function(data.peptides,
+                         data.proteins,
+                         cell.line,
+                         type,
+                         facet,
+                         accessions){
+    replicates <- pisaRex.preprocess(data.peptides,
+                                     data.proteins,
+                                     cell.line=cell.line,
+                                     type,
+                                     facet) %>% 
       filter(Accession %in% accessions)
-    A.log2ratios <- A.replicates %>% 
+    log2ratios <- replicates %>% 
       dplyr::select(`Gene Symbol`, starts_with("Abundance")) %>% 
       rowwise() %>% 
       mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
@@ -79,65 +88,49 @@ adj.p <- 1
       dplyr::select(!control_mean)
     
     #Some symbols can be repeated due to different isoforms. This handles it by numbering repeated names with parentheses:
-    A.log2ratios$`Gene Symbol` <- paste0(make_unique(A.log2ratios$`Gene Symbol`, sep = " ("),")")
-    A.log2ratios$`Gene Symbol` <- if_else(
-      str_detect(A.log2ratios$`Gene Symbol`, "\\(\\d+\\)$"),
-      A.log2ratios$`Gene Symbol`,
-      str_remove(A.log2ratios$`Gene Symbol`, "\\)$"))
+    log2ratios$`Gene Symbol` <- paste0(make_unique(log2ratios$`Gene Symbol`, sep = " ("),")")
+    log2ratios$`Gene Symbol` <- if_else(
+      str_detect(log2ratios$`Gene Symbol`, "\\(\\d+\\)$"),
+      log2ratios$`Gene Symbol`,
+      str_remove(log2ratios$`Gene Symbol`, "\\)$"))
     
-    B.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Beta",
-                                       facet=facet) %>% 
-      filter(Accession %in% accessions)
-    B.log2ratios <- B.replicates %>% 
-      dplyr::select(`Gene Symbol`, starts_with("Abundance")) %>% 
-      rowwise() %>% 
-      mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-      dplyr::select(`Gene Symbol`, contains("Sample"), control_mean) %>% 
-      mutate(across(starts_with("Abundance:"), ~.x - control_mean)) %>% 
-      dplyr::select(!control_mean)
-    
-    B.log2ratios$`Gene Symbol` <- paste0(make_unique(B.log2ratios$`Gene Symbol`, sep = " ("),")")
-    B.log2ratios$`Gene Symbol` <- if_else(
-      str_detect(B.log2ratios$`Gene Symbol`, "\\(\\d+\\)$"),
-      B.log2ratios$`Gene Symbol`,
-      str_remove(B.log2ratios$`Gene Symbol`, "\\)$"))
-    
-    G.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Gamma",
-                                       facet=facet) %>% 
-      filter(Accession %in% accessions)
-    G.log2ratios <- G.replicates %>% 
-      dplyr::select(`Gene Symbol`, starts_with("Abundance")) %>% 
-      rowwise() %>% 
-      mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-      dplyr::select(`Gene Symbol`, contains("Sample"), control_mean) %>% 
-      mutate(across(starts_with("Abundance:"), ~.x - control_mean)) %>% 
-      dplyr::select(!control_mean)
-    
-    G.log2ratios$`Gene Symbol` <- paste0(make_unique(G.log2ratios$`Gene Symbol`, sep = " ("),")")
-    G.log2ratios$`Gene Symbol` <- if_else(
-      str_detect(G.log2ratios$`Gene Symbol`, "\\(\\d+\\)$"),
-      G.log2ratios$`Gene Symbol`,
-      str_remove(G.log2ratios$`Gene Symbol`, "\\)$"))
-    
-    heatmap.df <- merge(A.log2ratios, 
-                        B.log2ratios, 
-                        by= "Gene Symbol",
-                        all.x=T, all.y=T)
-    
-    heatmap.df <- merge(heatmap.df, 
-                        G.log2ratios, 
-                        by= "Gene Symbol", 
-                        all.x=T, all.y=T)
-    
-    heatmap.matrix <- heatmap.df %>%
-      column_to_rownames("Gene Symbol") %>%
-      as.matrix()
+    return(log2ratios)
+  }
+  {
+  A <- Log2Ratios(data.peptides,
+                  data.proteins,
+                  cell.line,
+                  type="Alpha",
+                  facet,
+                  accessions)
+  
+  B <- Log2Ratios(data.peptides,
+                  data.proteins,
+                  cell.line,
+                  type="Beta",
+                  facet,
+                  accessions)
+  
+  G <- Log2Ratios(data.peptides,
+                  data.proteins,
+                  cell.line,
+                  type="Gamma",
+                  facet,
+                  accessions)
+  
+  heatmap.df <- merge(A, 
+                      B, 
+                      by="Gene Symbol",
+                      all.x=T, all.y=T)
+  
+  heatmap.df <- merge(heatmap.df, 
+                      G, 
+                      by="Gene Symbol", 
+                      all.x=T, all.y=T)
+  
+  heatmap.matrix <- heatmap.df %>%
+    column_to_rownames("Gene Symbol") %>%
+    as.matrix()
   }
   
   #Draw HM:
@@ -181,87 +174,93 @@ adj.p <- 1
 P <- 0.05
 adj.p <- 1
 {
+  facet <- "REX"
+  
   #Filter DIABLO hits by limma significance:
+  extract.sig.proteins <- function(data.peptides,
+                                   data.proteins,
+                                   cell.line,
+                                   type,
+                                   facet){
+    rowID  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
+                                               cell.line=cell.line,
+                                               type,
+                                               facet) %>% 
+      filter(P.Value < P & adj.P.Val < adj.p & peptideRowID %in% targets$redox$name) %>%
+      dplyr::select(peptideRowID) %>% pull()
+  }
   {
-    facet <- "REX"
-    rowID.A  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Alpha",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & peptideRowID %in% targets$redox$name) %>%
-      dplyr::select(peptideRowID) %>% pull()
+    A <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Alpha",
+                              facet)
     
-    rowID.B  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Beta",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & peptideRowID %in% targets$redox$name) %>%
-      dplyr::select(peptideRowID) %>% pull()
+    B <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Beta",
+                              facet)
     
-    rowID.G  <- pisaRex.pairwiseReport.accession(data.peptides, data.proteins, 
-                                                 cell.line=cell.line,
-                                                 type="Gamma",
-                                                 facet=facet) %>% 
-      filter(P.Value < P & adj.P.Val < adj.p & peptideRowID %in% targets$redox$name) %>%
-      dplyr::select(peptideRowID) %>% pull()
-    
-    accessions <- unique(c(rowID.A, rowID.B, rowID.G))
+    G <- extract.sig.proteins(data.peptides,
+                              data.proteins,
+                              cell.line,
+                              type="Gamma",
+                              facet)
+    accessions <- unique(c(A, B, G))
   }
   
   #Calculate Log2 Ratios:
+  Log2Ratios <- function(data.peptides,
+                         data.proteins,
+                         cell.line,
+                         type,
+                         facet,
+                         accessions){
+  replicates <- pisaRex.preprocess(data.peptides,
+                                   data.proteins,
+                                   cell.line,
+                                   type,
+                                   facet) %>% 
+  filter(peptideRowID %in% accessions)
+  
+  log2ratios <- replicates %>% 
+  dplyr::select(peptideRowID,`Master Protein Accessions`, starts_with("Abundance")) %>% 
+  rowwise() %>% 
+  mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
+  dplyr::select(peptideRowID, `Master Protein Accessions`,  contains("Sample"), control_mean) %>% 
+  mutate(across(starts_with("Abundance:"), ~ control_mean - .x)) %>% 
+  dplyr::select(!control_mean)
+}
   {
-    A.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Alpha",
-                                       facet=facet) %>% 
-      filter(peptideRowID %in% accessions)
+    A <- Log2Ratios(data.peptides,
+                    data.proteins,
+                    cell.line,
+                    type="Alpha",
+                    facet,
+                    accessions)
     
-    A.log2ratios <- A.replicates %>% 
-      dplyr::select(peptideRowID,`Master Protein Accessions`, starts_with("Abundance")) %>% 
-      rowwise() %>% 
-      mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-      dplyr::select(peptideRowID, `Master Protein Accessions`,  contains("Sample"), control_mean) %>% 
-      mutate(across(starts_with("Abundance:"), ~ control_mean - .x)) %>% 
-      dplyr::select(!control_mean)
+    B <- Log2Ratios(data.peptides,
+                    data.proteins,
+                    cell.line,
+                    type="Beta",
+                    facet,
+                    accessions)
     
-    B.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Beta",
-                                       facet=facet)  %>% 
-      filter(peptideRowID %in% accessions)
+    G <- Log2Ratios(data.peptides,
+                    data.proteins,
+                    cell.line,
+                    type="Gamma",
+                    facet,
+                    accessions)
     
-    B.log2ratios <- B.replicates %>% 
-      dplyr::select(peptideRowID,`Master Protein Accessions`, starts_with("Abundance")) %>% 
-      rowwise() %>% 
-      mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-      dplyr::select(peptideRowID, `Master Protein Accessions`,  contains("Sample"), control_mean) %>% 
-      mutate(across(starts_with("Abundance:"), ~ control_mean - .x)) %>% 
-      dplyr::select(!control_mean)
-    
-    G.replicates <- pisaRex.preprocess(data.peptides,
-                                       data.proteins,
-                                       cell.line=cell.line,
-                                       type="Gamma",
-                                       facet=facet) %>% 
-      filter(peptideRowID %in% accessions)
-    
-    G.log2ratios <- G.replicates %>% 
-      dplyr::select(peptideRowID, `Master Protein Accessions`,  starts_with("Abundance")) %>% 
-      rowwise() %>% 
-      mutate(control_mean = rowMeans(pick(contains("Control")), na.rm = TRUE)) %>% 
-      dplyr::select(peptideRowID, `Master Protein Accessions`,  contains("Sample"), control_mean) %>% 
-      mutate(across(starts_with("Abundance:"), ~ control_mean - .x)) %>% 
-      dplyr::select(!control_mean)
-    
-    heatmap.df <- merge(A.log2ratios, 
-                        B.log2ratios, 
+    heatmap.df <- merge(A, 
+                        B, 
                         by= c("peptideRowID", "Master Protein Accessions"),
                         all.x=T, all.y=T)
     
     heatmap.df <- merge(heatmap.df, 
-                        G.log2ratios, 
+                        G, 
                         by= c("peptideRowID", "Master Protein Accessions"),
                         all.x=T, all.y=T)
     heatmap.df[is.na(heatmap.df)] <- 0
