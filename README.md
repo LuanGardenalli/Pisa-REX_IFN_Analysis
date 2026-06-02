@@ -6,13 +6,13 @@ Publications TBA.
 
 ## Primary Data Analysis Scripts:
 
-**pisaRex_preprocessing.R:** Isolates and preprocesses the replicate data from the pair of interest for down-stream analysis.
+*pisaRex_preprocessing.R:* Isolates and preprocesses the replicate data from the pair of interest for down-stream analysis.
 
-**pisaRex_pairwiseReport.R:** Provides a statistical/differential regulation report for the pair of interest. Calculated using the empirical Bayes method (limma).
+*pisaRex_pairwiseReport.R:* Provides a statistical/differential regulation report for the pair of interest. Calculated using the empirical Bayes method (limma).
 
-**DIABLO.R:** Performs a multiblock (s)PLS-DA analysis using the mixOmics package.
+*DIABLO.R:* Performs a multiblock (s)PLS-DA analysis using the mixOmics package.
 
-**GSEA_Ranked_List.R:** Outputs the pre-ranked lists used for GSEA analysis.
+*GSEA_Ranked_List.R:* Outputs the pre-ranked lists used for GSEA analysis.
 
 ## Figures:
 
