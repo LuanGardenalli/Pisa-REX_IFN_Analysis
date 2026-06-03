@@ -1,6 +1,6 @@
 library(tidyverse)
 
-#Creates a dataframe with t-values for each facet, for each pair:
+#Creates a dataframe with t-values for each facet, for a given pair:
 mergeFacets <- function(data.peptides, 
                         data.proteins, 
                         cell.line, 
