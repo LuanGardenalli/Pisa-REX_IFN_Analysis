@@ -18,7 +18,7 @@ This repository contains the R-based bioinformatics pipeline used to process, an
 
 ## Figures:
 
-All R scripts utilized to generate the primary manuscript visualizations are located in the Figures/ directory.
+All R scripts utilized to generate the primary manuscript visualizations are located in the [Figures](Figures/) directory.
 
 ## Main Dependencies:
 
